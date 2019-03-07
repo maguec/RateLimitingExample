@@ -21,23 +21,30 @@ def throttle():
        resp = Response("Please set the X-API-Key header", status=401)
        return resp
 
-   epoch_time = int(time.time())
+   epoch_ms = int(time.time()*1000)
    pipe = r.pipeline()
-   pipe.incrby("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600), 1)
-   pipe.incrby("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400), 1)
-   pipe.get("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600))
-   pipe.get("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400))
-   pipe.expire("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600), 3601)
-   pipe.expire("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400), 86401)
+
+   pipe.zremrangebyscore("%s:hourly" %(api), 0,  epoch_ms - 360000)
+   pipe.zrange("%s:hourly" %(api), 0, -1)
+   pipe.zadd("%s:hourly" %(api), {epoch_ms: epoch_ms})
+   pipe.expire("%s:hourly" %(api), 3600001)
+
+   pipe.zremrangebyscore("%s:daily" %(api), 0,  epoch_ms - 86400000)
+   pipe.zrange("%s:daily" %(api), 0, -1)
+   pipe.zadd("%s:daily" %(api), {epoch_ms: epoch_ms})
+   pipe.expire("%s:daily" %(api), 86400000)
+
    res = pipe.execute()
 
-   if int(res[2]) > CALL_PER_HOUR or int(res[3]) > CALL_PER_DAY:
+   print(res)
+
+   if len(res[1]) > CALL_PER_HOUR or len(res[5]) > CALL_PER_DAY:
        resp = Response("DATA Exceeded", status=429)
    else:
        resp = Response("DATA OK", status=200)
 
-   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - int(res[2])
-   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - int(res[3])
+   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - len(res[1])
+   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - len(res[5])
    return resp
 
 
