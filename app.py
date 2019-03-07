@@ -14,6 +14,10 @@ def hello_root():
 
 @app.route('/throttle')
 def throttle():
+
+   # set the points for this route to 4
+   ROUTE_SCORE = 4
+
    r = redis.Redis(host='localhost', port=6379, db=0)
 
    api = request.headers.get('X-API-Key')
@@ -26,25 +30,27 @@ def throttle():
 
    pipe.zremrangebyscore("%s:hourly" %(api), 0,  epoch_ms - 360000)
    pipe.zrange("%s:hourly" %(api), 0, -1)
-   pipe.zadd("%s:hourly" %(api), {epoch_ms: epoch_ms})
+   pipe.zadd("%s:hourly" %(api), {"%d:%d" %(epoch_ms, ROUTE_SCORE): epoch_ms})
    pipe.expire("%s:hourly" %(api), 3600001)
 
    pipe.zremrangebyscore("%s:daily" %(api), 0,  epoch_ms - 86400000)
    pipe.zrange("%s:daily" %(api), 0, -1)
-   pipe.zadd("%s:daily" %(api), {epoch_ms: epoch_ms})
+   pipe.zadd("%s:daily" %(api), {"%d:%d" %(epoch_ms, ROUTE_SCORE): epoch_ms})
    pipe.expire("%s:daily" %(api), 86400000)
 
    res = pipe.execute()
 
-   print(res)
+   hour_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[1])
+   day_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[5])
 
-   if len(res[1]) > CALL_PER_HOUR or len(res[5]) > CALL_PER_DAY:
+
+   if hour_score > CALL_PER_HOUR or day_score > CALL_PER_DAY:
        resp = Response("DATA Exceeded", status=429)
    else:
        resp = Response("DATA OK", status=200)
 
-   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - len(res[1])
-   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - len(res[5])
+   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - hour_score
+   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - day_score
    return resp
 
 
