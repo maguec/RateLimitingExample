@@ -29,19 +29,19 @@ def throttle():
    pipe = r.pipeline()
 
    pipe.zremrangebyscore("%s:hourly" %(api), 0,  epoch_ms - 360000)
-   pipe.zrange("%s:hourly" %(api), 0, -1)
    pipe.zadd("%s:hourly" %(api), {"%d:%d" %(epoch_ms, ROUTE_SCORE): epoch_ms})
+   pipe.zrange("%s:hourly" %(api), 0, -1)
    pipe.expire("%s:hourly" %(api), 3600001)
 
    pipe.zremrangebyscore("%s:daily" %(api), 0,  epoch_ms - 86400000)
-   pipe.zrange("%s:daily" %(api), 0, -1)
    pipe.zadd("%s:daily" %(api), {"%d:%d" %(epoch_ms, ROUTE_SCORE): epoch_ms})
+   pipe.zrange("%s:daily" %(api), 0, -1)
    pipe.expire("%s:daily" %(api), 86400000)
 
    res = pipe.execute()
 
-   hour_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[1])
-   day_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[5])
+   hour_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[2])
+   day_score = sum(int(i.decode("utf-8").split(':')[-1]) for i in res[6])
 
 
    if hour_score > CALL_PER_HOUR or day_score > CALL_PER_DAY:
