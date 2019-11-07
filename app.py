@@ -25,19 +25,17 @@ def throttle():
    pipe = r.pipeline()
    pipe.incrby("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600), 1)
    pipe.incrby("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400), 1)
-   pipe.get("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600))
-   pipe.get("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400))
    pipe.expire("%s:hourly:%d" %(api, int(epoch_time/3600.0)*3600), 3601)
    pipe.expire("%s:daily:%d" %(api, int(epoch_time/86400.0)*86400), 86401)
    res = pipe.execute()
 
-   if int(res[2]) > CALL_PER_HOUR or int(res[3]) > CALL_PER_DAY:
+   if int(res[0]) > CALL_PER_HOUR or int(res[1]) > CALL_PER_DAY:
        resp = Response("DATA Exceeded", status=429)
    else:
        resp = Response("DATA OK", status=200)
 
-   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - int(res[2])
-   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - int(res[3])
+   resp.headers['X-Rate-Limit-Hour-Remaining'] = CALL_PER_HOUR - int(res[0])
+   resp.headers['X-Rate-Limit-Day-Remaining'] = CALL_PER_DAY - int(res[1])
    return resp
 
 
